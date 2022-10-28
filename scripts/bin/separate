@@ -1,0 +1,18 @@
+#!/bin/bash
+
+# https://github.com/facebookresearch/demucs
+# If you only want to separate vocals out of an audio, use `--two-stems=vocal` (You can also set to drums or bass)
+# You can select different models with `-n` mdx_q is the quantized model, smaller but maybe a bit less accurate.
+
+# The -j flag allow to specify a number of parallel jobs
+
+song_name=$1
+shift
+song_dir="$__BASE_PATH/tracks/$song_name"
+song_path="$song_dir/full.mp3"
+echo "Separating $song_path"
+poetry run demucs -d cpu "$song_path" -j 6 $@
+
+# read -t 0 -p "pausing..." # pause
+cp -R "$__BASE_PATH"/separated/*/*/*.wav "$song_dir"
+rm -rf "$__BASE_PATH/separated/"

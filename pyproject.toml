@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "ptrd"
+version = "0.1.0"
+description = ""
+authors = ["tripp528 <33329853+tripp528@users.noreply.github.com>"]
+readme = "README.md"
+packages = [{include = "ptrd"}]
+
+[tool.poetry.dependencies]
+python = "3.9.1"
+demucs = "^3.0.5"
+spotdl = "^4.0.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

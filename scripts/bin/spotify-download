@@ -1,0 +1,10 @@
+#!/bin/bash
+
+search_query=$1
+shift # throws away first arg from $@
+poetry run spotdl download "$search_query" $@
+
+song_name="${search_query// /_}"
+output_dir_path="$__BASE_PATH/tracks/$song_name"
+mkdir -p "$output_dir_path"
+mv *.mp3 "$output_dir_path/full.mp3"
