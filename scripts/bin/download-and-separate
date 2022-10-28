@@ -1,0 +1,9 @@
+#!/bin/bash
+
+search_query=$1
+shift
+song_name="${search_query// /_}"
+song_dir="$__BASE_PATH/tracks/$song_name"
+
+spotify-download "$search_query" "$song_dir"
+separate "$song_name"
