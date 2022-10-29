@@ -6,13 +6,16 @@
 
 # The -j flag allow to specify a number of parallel jobs
 
-song_name=$1
+song_path=$1
 shift
-song_dir="$__BASE_PATH/tracks/$song_name"
-song_path="$song_dir/full.mp3"
+output_dir=$1
+shift
 echo "Separating $song_path"
-poetry run demucs -d cpu "$song_path" -j 6 $@
+poetry run demucs "$song_path" $@ 
+# more options
+# -j 6 
+# -d cpu
 
 # read -t 0 -p "pausing..." # pause
-cp -R "$__BASE_PATH"/separated/*/*/*.wav "$song_dir"
+cp -R "$__BASE_PATH"/separated/*/*/*.wav "$output_dir"
 rm -rf "$__BASE_PATH/separated/"
