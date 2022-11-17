@@ -6,5 +6,8 @@ separated/
 *.wav
 .DS_Store
 
+research
+ext
+
 
 __pycache__

@@ -38,4 +38,6 @@ Current work worth looking into:
 
 - https://mawf.io/
 
-- 
+- https://github.com/pytorch/audio
+
+- https://github.com/nir/jupylet
