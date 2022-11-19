@@ -27,8 +27,8 @@ def filtered_saw(cutoff=300, freq=40, duration=3, sr=FPS):
     a0 *= e0
 
     # lowpass filter 
-    # fltr = ja.ResonantFilter(freq=cutoff)
-    # a0 = fltr(a0)
+    fltr = ja.ResonantFilter(freq=cutoff)
+    a0 = fltr(a0)
     # print(type(a0))
 
     return a0

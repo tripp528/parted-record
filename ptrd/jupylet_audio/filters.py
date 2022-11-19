@@ -29,7 +29,7 @@ import functools
 import logging
 import time
 
-import jax.scipy.signal
+import scipy.signal
 
 import jax.numpy as jnp
 
@@ -151,10 +151,10 @@ class ButterFilter(BaseFilter):
 
             if self.output == 'ba':
                 b, a, z0 = signal_butter(wp, 3, self.db, self.btype, self.output)
-                return jax.scipy.signal.lfilter(b, a, x, 0, z0 if z is None else z)                
+                return scipy.signal.lfilter(b, a, x, 0, z0 if z is None else z)                
             else:
                 sos, z0 = signal_butter(wp, 3, self.db, self.btype, self.output)
-                return jax.scipy.signal.sosfilt(sos, x, 0, z0 if z is None else z)
+                return scipy.signal.sosfilt(sos, x, 0, z0 if z is None else z)
         
         except ValueError:
             if z is None or not _retry:
@@ -178,16 +178,16 @@ def signal_butter(wp, gpass=3, gstop=24, btype='lowpass', output='ba', fs=FPS):
         wp = [max(wp[0], 1), min(wp[1], nyq - 1)]
         ws = [wp[0] / 2, min(wp[1] * 2, nyq)]
 
-    N, Wn = jax.scipy.signal.buttord(wp, ws, gpass, gstop, fs=fs)
+    N, Wn = scipy.signal.buttord(wp, ws, gpass, gstop, fs=fs)
 
     if output == 'ba':
-        b, a = jax.scipy.signal.butter(N, Wn, btype, output='ba', fs=fs)
-        z = jax.scipy.signal.lfilter_zi(b, a)[:,None]
+        b, a = scipy.signal.butter(N, Wn, btype, output='ba', fs=fs)
+        z = scipy.signal.lfilter_zi(b, a)[:,None]
         return b, a, z
 
     else:
-        sos = jax.scipy.signal.butter(N, Wn, btype, output='sos', fs=fs)
-        z = jax.scipy.signal.sosfilt_zi(sos)[:,:,None]
+        sos = scipy.signal.butter(N, Wn, btype, output='sos', fs=fs)
+        z = scipy.signal.sosfilt_zi(sos)[:,:,None]
         return sos, z
 
 
@@ -210,7 +210,7 @@ class PeakFilter(BaseFilter):
     def filter(self, x, freq, z=None):
         
         b, a, z0 = signal_iirpeak(freq, self.q)
-        return jax.scipy.signal.lfilter(b, a, x, 0, z0 if z is None else z) 
+        return scipy.signal.lfilter(b, a, x, 0, z0 if z is None else z) 
         
 
 @functools.lru_cache(maxsize=4096)
@@ -219,8 +219,8 @@ def signal_iirpeak(w0, q, fs=FPS):
     nyq = fs // 2
     w0 = max(1, min(w0, nyq - 1))
 
-    b, a = jax.scipy.signal.iirpeak(w0, q, fs=fs)
-    z = jax.scipy.signal.lfilter_zi(b, a)[:,None]
+    b, a = scipy.signal.iirpeak(w0, q, fs=fs)
+    z = scipy.signal.lfilter_zi(b, a)[:,None]
 
     return b, a, z
 
