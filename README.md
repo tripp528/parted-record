@@ -41,3 +41,5 @@ Current work worth looking into:
 - https://github.com/pytorch/audio
 
 - https://github.com/nir/jupylet
+
+- https://github.com/pytorch/audio/issues/2835

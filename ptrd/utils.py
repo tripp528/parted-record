@@ -85,7 +85,7 @@ def spec_plot(sample, ax=None, show=True, sr=FPS, freq_range=(0, 20000)):
     if show: plt.show
 
 
-def visualize_sample(sample, sr=FPS, freq_range=(1, 600)):
+def visualize_sample(sample, sr=FPS, freq_range=(1, 20000)):
     ''' Plot and visualize a sample. 
     '''
     sample = np.asarray(sample).squeeze()
