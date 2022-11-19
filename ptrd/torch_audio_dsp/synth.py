@@ -56,3 +56,23 @@ def saw(f0=440, duration=2, sr=utils.FPS, ):
         sample_rate=sr
     )
     return a0
+
+
+def filt(a0, cutoff, type='lp'): 
+    '''
+        - a0: waveform to apply filter to
+        - cutoff (int): cutoff frequency in hz (0, 20000)
+        - type: one of 'lp' or 'hp' (lowpass, highpass)
+    '''
+
+    # window_size (int): Size of the Hamming window to apply. Must be odd.
+    window_size = 2049
+    num_filters = 1 # this can be changed to 'automate' cutoff 
+
+    normalized_cutoff = cutoff / 20000
+    cutoff_arr = torch.ones(num_filters) * normalized_cutoff
+    filt_arr = sinc_filter(cutoff_arr , window_size)
+    a1 = apply_time_varying_filter(a0, filt_arr)
+    return a1
+
+
