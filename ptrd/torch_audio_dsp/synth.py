@@ -18,7 +18,7 @@ def sine(f0=440, duration=2, sr=utils.FPS):
         - duration (float): seconds 
         - sr: sample rate (per second)
     '''
-    n_frames = sr * duration 
+    n_frames = int(sr * duration)
 
     freq_arr = torch.full((n_frames, 1), f0)
     amp_arr = torch.ones((n_frames, 1))
@@ -38,7 +38,7 @@ def saw(f0=440, duration=2, sr=utils.FPS):
         - 
     '''
     # generate base frequency and amp arrays (sine wave) 
-    n_frames = sr * duration 
+    n_frames = int(sr * duration)
     freq_arr = torch.full((n_frames, 1), f0)
     amp_arr = torch.ones((n_frames, 1))
 
