@@ -43,3 +43,9 @@ Current work worth looking into:
 - https://github.com/nir/jupylet
 
 - https://github.com/pytorch/audio/issues/2835
+
+
+
+### Stable diffusion
+
+[Textual Inversion](https://huggingface.co/docs/diffusers/training/text_inversion)
