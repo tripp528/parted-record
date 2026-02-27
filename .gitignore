@@ -11,4 +11,3 @@ __pycache__test_output/
 .venv/
 __pycache__/
 *.pyc
-docs/results.html
