@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>parted-record — reverse-engineer any sound</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #0a0a0f;
+    --bg2: #12121a;
+    --bg3: #1a1a2e;
+    --accent: #7b2ff7;
+    --accent2: #f72f8e;
+    --accent3: #2ff7c3;
+    --text: #e8e8f0;
+    --text-dim: #8888a0;
+    --card: #16162a;
+    --card-border: #2a2a44;
+    --glow: rgba(123, 47, 247, 0.3);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'Space Grotesk', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ═══ HERO ═══ */
+  .hero {
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 2rem 1.5rem;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(ellipse at 30% 50%, rgba(123,47,247,0.12) 0%, transparent 50%),
+                radial-gradient(ellipse at 70% 50%, rgba(247,47,142,0.08) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 80%, rgba(47,247,195,0.06) 0%, transparent 40%);
+    animation: drift 20s ease-in-out infinite alternate;
+    z-index: 0;
+  }
+
+  @keyframes drift {
+    0% { transform: translate(0, 0) rotate(0deg); }
+    100% { transform: translate(-3%, 2%) rotate(3deg); }
+  }
+
+  .hero > * { position: relative; z-index: 1; }
+
+  .hero-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    animation: pulse 3s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); opacity: 0.9; }
+    50% { transform: scale(1.1); opacity: 1; }
+  }
+
+  .hero h1 {
+    font-size: clamp(2.2rem, 8vw, 4.5rem);
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    margin-bottom: 1rem;
+    background: linear-gradient(135deg, var(--text) 0%, var(--accent) 50%, var(--accent2) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .hero .tagline {
+    font-size: clamp(1rem, 3vw, 1.4rem);
+    color: var(--text-dim);
+    max-width: 500px;
+    margin-bottom: 2.5rem;
+    font-weight: 300;
+  }
+
+  .hero .tagline em {
+    color: var(--accent3);
+    font-style: normal;
+    font-weight: 500;
+  }
+
+  .scroll-hint {
+    position: absolute;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    animation: bob 2s ease-in-out infinite;
+    z-index: 1;
+  }
+
+  @keyframes bob {
+    0%, 100% { transform: translateX(-50%) translateY(0); }
+    50% { transform: translateX(-50%) translateY(8px); }
+  }
+
+  /* ═══ SECTIONS ═══ */
+  section {
+    padding: 4rem 1.5rem;
+    max-width: 800px;
+    margin: 0 auto;
+  }
+
+  .section-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--accent);
+    margin-bottom: 0.5rem;
+  }
+
+  section h2 {
+    font-size: clamp(1.6rem, 5vw, 2.4rem);
+    font-weight: 600;
+    margin-bottom: 1rem;
+    letter-spacing: -0.02em;
+  }
+
+  section p {
+    color: var(--text-dim);
+    margin-bottom: 1.5rem;
+    font-size: 1.05rem;
+  }
+
+  /* ═══ THE PROBLEM ═══ */
+  .problem-visual {
+    background: var(--bg2);
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    padding: 2rem;
+    margin: 2rem 0;
+    text-align: center;
+  }
+
+  .problem-flow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .flow-step {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    font-size: 1.1rem;
+    padding: 0.8rem 1.2rem;
+    border-radius: 12px;
+    width: 100%;
+    max-width: 400px;
+  }
+
+  .flow-step.good { background: rgba(47,247,195,0.08); border: 1px solid rgba(47,247,195,0.2); }
+  .flow-step.bad { background: rgba(247,47,142,0.08); border: 1px solid rgba(247,47,142,0.2); }
+  .flow-step.magic { background: rgba(123,47,247,0.12); border: 1px solid rgba(123,47,247,0.3); box-shadow: 0 0 30px var(--glow); }
+
+  .flow-arrow {
+    font-size: 1.5rem;
+    color: var(--text-dim);
+  }
+
+  /* ═══ LOOP ANIMATION ═══ */
+  .loop-container {
+    background: var(--bg2);
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    padding: 2rem 1rem;
+    margin: 2rem 0;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .loop-diagram {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+  }
+
+  .loop-node {
+    padding: 0.7rem 1.2rem;
+    border-radius: 10px;
+    text-align: center;
+    min-width: 200px;
+    position: relative;
+  }
+
+  .loop-node.target { background: linear-gradient(135deg, rgba(247,47,142,0.2), rgba(247,47,142,0.05)); border: 1px solid rgba(247,47,142,0.3); }
+  .loop-node.synth { background: linear-gradient(135deg, rgba(123,47,247,0.2), rgba(123,47,247,0.05)); border: 1px solid rgba(123,47,247,0.3); }
+  .loop-node.loss { background: linear-gradient(135deg, rgba(47,247,195,0.2), rgba(47,247,195,0.05)); border: 1px solid rgba(47,247,195,0.3); }
+  .loop-node.optimizer { background: linear-gradient(135deg, rgba(247,195,47,0.2), rgba(247,195,47,0.05)); border: 1px solid rgba(247,195,47,0.3); }
+  .loop-node.output { background: linear-gradient(135deg, rgba(47,247,100,0.2), rgba(47,247,100,0.05)); border: 1px solid rgba(47,247,100,0.3); }
+
+  .loop-arrow {
+    color: var(--text-dim);
+    font-size: 1.2rem;
+    animation: fadeLoop 3s ease-in-out infinite;
+  }
+
+  .loop-arrow:nth-child(2) { animation-delay: 0.3s; }
+  .loop-arrow:nth-child(4) { animation-delay: 0.6s; }
+  .loop-arrow:nth-child(6) { animation-delay: 0.9s; }
+  .loop-arrow:nth-child(8) { animation-delay: 1.2s; }
+  .loop-arrow:nth-child(10) { animation-delay: 1.5s; }
+
+  @keyframes fadeLoop {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 1; }
+  }
+
+  .loop-label {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    margin-top: 1rem;
+    text-align: center;
+  }
+
+  /* ═══ IDEA CARDS ═══ */
+  .ideas-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.2rem;
+    margin-top: 2rem;
+  }
+
+  .idea-card {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    padding: 1.5rem;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .idea-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .idea-card:hover, .idea-card:active {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(123,47,247,0.15);
+  }
+
+  .idea-card:hover::before, .idea-card:active::before { opacity: 1; }
+
+  .idea-header {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    margin-bottom: 0.8rem;
+  }
+
+  .idea-emoji {
+    font-size: 1.8rem;
+    flex-shrink: 0;
+  }
+
+  .idea-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+
+  .idea-desc {
+    color: var(--text-dim);
+    font-size: 0.95rem;
+    line-height: 1.5;
+  }
+
+  .idea-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 1rem;
+  }
+
+  .tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    padding: 0.25rem 0.6rem;
+    border-radius: 6px;
+    background: rgba(123,47,247,0.1);
+    color: var(--accent);
+    border: 1px solid rgba(123,47,247,0.2);
+  }
+
+  .tag.hot { background: rgba(247,47,142,0.1); color: var(--accent2); border-color: rgba(247,47,142,0.2); }
+  .tag.green { background: rgba(47,247,195,0.1); color: var(--accent3); border-color: rgba(47,247,195,0.2); }
+
+  .idea-detail {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.4s ease, margin 0.3s ease;
+  }
+
+  .idea-card.expanded .idea-detail {
+    max-height: 800px;
+    margin-top: 1rem;
+  }
+
+  .idea-detail-inner {
+    padding-top: 1rem;
+    border-top: 1px solid var(--card-border);
+    color: var(--text-dim);
+    font-size: 0.9rem;
+    line-height: 1.6;
+  }
+
+  .idea-detail-inner code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    background: var(--bg);
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    color: var(--accent3);
+  }
+
+  .idea-detail-inner .detail-stack {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0.8rem 0;
+  }
+
+  .detail-stack-item {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    padding: 0.4rem 0.8rem;
+    border-radius: 8px;
+    background: var(--bg);
+    border: 1px solid var(--card-border);
+  }
+
+  /* ═══ DEMO EMBEDS ═══ */
+  .demos-list {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.2rem;
+    margin-top: 2rem;
+  }
+
+  .demo-card {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    overflow: hidden;
+    transition: transform 0.2s;
+  }
+
+  .demo-card:active { transform: scale(0.98); }
+
+  .demo-thumb {
+    width: 100%;
+    aspect-ratio: 16/9;
+    background: var(--bg3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+  }
+
+  .demo-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .demo-thumb .play-btn {
+    position: absolute;
+    width: 60px;
+    height: 60px;
+    background: rgba(0,0,0,0.7);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(8px);
+    transition: transform 0.2s;
+  }
+
+  .demo-thumb:hover .play-btn { transform: scale(1.1); }
+
+  .play-btn::after {
+    content: '';
+    width: 0;
+    height: 0;
+    border-style: solid;
+    border-width: 10px 0 10px 18px;
+    border-color: transparent transparent transparent white;
+    margin-left: 4px;
+  }
+
+  .demo-thumb iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+  }
+
+  .demo-info {
+    padding: 1rem 1.2rem;
+  }
+
+  .demo-info h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 0.3rem;
+  }
+
+  .demo-info p {
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    margin: 0;
+  }
+
+  .demo-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 0.85rem;
+    margin-top: 0.5rem;
+    font-weight: 500;
+  }
+
+  /* ═══ TECH STACK ═══ */
+  .stack-flow {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin: 2rem 0;
+    position: relative;
+  }
+
+  .stack-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.2rem;
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    position: relative;
+  }
+
+  .stack-item:first-child { border-radius: 16px 16px 0 0; }
+  .stack-item:last-child { border-radius: 0 0 16px 16px; }
+  .stack-item + .stack-item { border-top: none; }
+
+  .stack-icon { font-size: 1.5rem; flex-shrink: 0; }
+
+  .stack-name {
+    font-weight: 600;
+    font-size: 0.95rem;
+  }
+
+  .stack-desc {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+  }
+
+  .stack-connector {
+    width: 2px;
+    height: 12px;
+    background: var(--accent);
+    margin-left: 2.4rem;
+    opacity: 0.4;
+  }
+
+  /* ═══ QUOTE ═══ */
+  .quote-block {
+    background: linear-gradient(135deg, rgba(123,47,247,0.08), rgba(247,47,142,0.05));
+    border-left: 3px solid var(--accent);
+    border-radius: 0 12px 12px 0;
+    padding: 1.5rem;
+    margin: 2rem 0;
+    font-style: italic;
+    color: var(--text);
+    font-size: 1.1rem;
+    line-height: 1.5;
+  }
+
+  .quote-block .attr {
+    font-style: normal;
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    margin-top: 0.5rem;
+  }
+
+  /* ═══ CTA ═══ */
+  .cta-section {
+    text-align: center;
+    padding: 4rem 1.5rem 6rem;
+  }
+
+  .cta-section h2 {
+    background: linear-gradient(135deg, var(--accent3), var(--accent));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .cta-links {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    margin-top: 2rem;
+    align-items: center;
+  }
+
+  .cta-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.9rem 1.8rem;
+    border-radius: 12px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 1rem;
+    transition: all 0.2s;
+    min-width: 240px;
+    justify-content: center;
+  }
+
+  .cta-btn.primary {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: white;
+  }
+
+  .cta-btn.secondary {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    color: var(--text);
+  }
+
+  .cta-btn:active { transform: scale(0.97); }
+
+  /* ═══ WAVEFORM DECORATION ═══ */
+  .waveform-divider {
+    height: 40px;
+    margin: 1rem 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    opacity: 0.3;
+  }
+
+  .waveform-divider .bar {
+    width: 3px;
+    border-radius: 2px;
+    background: var(--accent);
+    animation: wave 1.5s ease-in-out infinite;
+  }
+
+  @keyframes wave {
+    0%, 100% { height: 4px; }
+    50% { height: 24px; }
+  }
+
+  /* ═══ RESPONSIVE ═══ */
+  @media (min-width: 640px) {
+    .ideas-grid { grid-template-columns: 1fr 1fr; }
+    .idea-card.wide { grid-column: span 2; }
+    .demos-list { grid-template-columns: 1fr 1fr; }
+    section { padding: 5rem 2rem; }
+  }
+
+  /* ═══ SAFE AREA ═══ */
+  @supports (padding: env(safe-area-inset-bottom)) {
+    .cta-section { padding-bottom: calc(4rem + env(safe-area-inset-bottom)); }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══ HERO ═══ -->
+<div class="hero">
+  <div class="hero-icon">🎛️</div>
+  <h1>parted-record</h1>
+  <p class="tagline">You heard a sound you love. Now <em>reverse-engineer the preset</em>. Drop in a sample, get back the knobs.</p>
+  <div class="scroll-hint">↓ scroll to explore</div>
+</div>
+
+<!-- ═══ THE PROBLEM ═══ -->
+<section>
+  <div class="section-label">// the problem</div>
+  <h2>Samples don't transpose.</h2>
+  <p>You found the perfect bass on Splice. Rich, gritty, alive. But pitch it down a fifth and it turns into mud. Pitch it up and the character vanishes. The magic lives at exactly one note.</p>
+
+  <div class="problem-visual">
+    <div class="problem-flow">
+      <div class="flow-step good">🎵 Find perfect Splice sample</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step good">🎹 Sounds amazing at C4</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step bad">😩 Transpose to F3 → sounds like garbage</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step bad">🔧 Try to recreate manually → 3 hours later...</div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-step magic">✨ What if a machine could find the preset?</div>
+    </div>
+  </div>
+
+  <p>What if you could feed a sample to an optimizer, and it figures out exactly which synth knobs to turn to recreate that sound? Then you'd have a <em>playable instrument</em> — not a frozen sample.</p>
+</section>
+
+<!-- ═══ HOW IT WORKS ═══ -->
+<section>
+  <div class="section-label">// the loop</div>
+  <h2>Optimize until it sounds right.</h2>
+  <p>The concept is simple: render the synth, compare to the target, adjust the knobs, repeat. Each parameter is a dimension in the search space. The optimizer explores until the loss hits zero — or close enough for human ears.</p>
+
+  <div class="loop-container">
+    <div class="loop-diagram">
+      <div class="loop-node target">🎯 Target Audio (your Splice sample)</div>
+      <div class="loop-arrow">↓ extract features</div>
+      <div class="loop-node loss">📊 Compare (multi-resolution STFT loss)</div>
+      <div class="loop-arrow">↓ how far off?</div>
+      <div class="loop-node optimizer">🧬 Optimizer (CMA-ES / gradient descent)</div>
+      <div class="loop-arrow">↓ adjust knobs</div>
+      <div class="loop-node synth">🎛️ Synth (Surge XT via DawDreamer)</div>
+      <div class="loop-arrow">↓ render audio</div>
+      <div class="loop-node loss">📊 Compare again...</div>
+      <div class="loop-arrow">🔄 repeat 500× </div>
+      <div class="loop-node output">✅ Best preset found → export .fxp</div>
+    </div>
+    <div class="loop-label">~ 500 iterations • ~ 2 minutes on a good CPU • fully headless</div>
+  </div>
+</section>
+
+<!-- ═══ WAVEFORM ═══ -->
+<div class="waveform-divider" id="waveDivider"></div>
+
+<!-- ═══ IDEAS ═══ -->
+<section>
+  <div class="section-label">// the ideas</div>
+  <h2>Nine ways to build this.</h2>
+  <p>From weekend MVP to nuclear-option JAX pipelines. Tap any card to dig deeper.</p>
+
+  <div class="ideas-grid">
+
+    <div class="idea-card wide" onclick="this.classList.toggle('expanded')">
+      <div class="idea-header">
+        <div class="idea-emoji">🔥</div>
+        <div class="idea-title">The MVP: CMA-ES Preset Matcher</div>
+      </div>
+      <div class="idea-desc">Drop a sample in, get a Surge XT preset out. Evolutionary optimization, no ML training needed. This is a weekend build.</div>
+      <div class="idea-tags">
+        <span class="tag hot">start here</span>
+        <span class="tag">CMA-ES</span>
+        <span class="tag">DawDreamer</span>
+        <span class="tag">Surge XT</span>
+        <span class="tag">auraloss</span>
+      </div>
+      <div class="idea-detail">
+        <div class="idea-detail-inner">
+          <strong>The stack:</strong>
+          <div class="detail-stack">
+            <span class="detail-stack-item">🎛️ Surge XT (free, open-source, 200+ params)</span>
+            <span class="detail-stack-item">🐍 DawDreamer (headless VST rendering)</span>
+            <span class="detail-stack-item">🧬 CMA-ES (evolution strategy, pip install cma)</span>
+            <span class="detail-stack-item">👂 auraloss (multi-res STFT loss)</span>
+          </div>
+          CMA-ES treats the synth as a black box — no gradients needed. It evolves a population of parameter sets, keeping the ones that sound closest to your target. Handles 200+ dimensions gracefully. Yee-King proved this works in his 2011 thesis — we just have better tools now.
+        </div>
+      </div>
+    </div>
+
+    <div class="idea-card" onclick="this.classList.toggle('expanded')">
+      <div class="idea-header">
+        <div class="idea-emoji">⚡</div>
+        <div class="idea-title">Differentiable Proxy</div>
+      </div>
+      <div class="idea-desc">Train a neural net to emulate the VST. Then optimize through it with gradient descent. 100-1000× faster.</div>
+      <div class="idea-tags">
+        <span class="tag">PyTorch</span>
+        <span class="tag">MLP proxy</span>
+        <span class="tag green">big speedup</span>
+      </div>
+      <div class="idea-detail">
+        <div class="idea-detail-inner">
+          Generate 50k random patches with DawDreamer, train a small network to predict <code>params → mel spectrogram</code>. Now you have a differentiable synth. Adam optimizer, 2000 steps, done. The proxy training is the upfront cost — but once you have it, every match is near-instant.
+        </div>
+      </div>
+    </div>
+
+    <div class="idea-card" onclick="this.classList.toggle('expanded')">
+      <div class="idea-header">
+        <div class="idea-emoji">☢️</div>
+        <div class="idea-title">FAUST → JAX Nuclear Option</div>
+      </div>
+      <div class="idea-desc">Write the synth in FAUST, transpile to JAX via DawDreamer. GPU-accelerated, fully differentiable. 90,000× realtime.</div>
+      <div class="idea-tags">
+        <span class="tag hot">wild</span>
+        <span class="tag">JAX</span>
+        <span class="tag">FAUST</span>
+        <span class="tag">GPU</span>
+      </div>
+      <div class="idea-detail">
+        <div class="idea-detail-inner">
+          DawDreamer can transpile FAUST DSP code directly to JAX. SynthAX showed that JAX synths run at 90,000× realtime on GPU. Optimization that takes minutes with CMA-ES could take <em>seconds</em>. The catch: you need to write (or find) your synth in FAUST. But FAUST has a huge library of DSP primitives.
+        </div>
+      </div>
+    </div>
+
+    <div class="idea-card" onclick="this.classList.toggle('expanded')">
+      <div class="idea-header">
+        <div class="idea-emoji">🎹</div>
+        <div class="idea-title">Multi-Note Optimization</div>
+      </div>
+      <div class="idea-desc">Don't just match one note — match across the whole keyboard. C2 through C6. Velocity too.</div>
+      <div class="idea-tags">
+        <span class="tag">robustness</span>
+        <span class="tag green">musical</span>
+      </div>
+      <div class="idea-detail">
+        <div class="idea-detail-inner">
+          A preset that sounds right at C4 but wrong at C2 is useless. Sum the loss across multiple MIDI notes and velocities. This is what makes the result actually <em>playable</em> — the whole point of the project.
+        </div>
+      </div>
+    </div>
+
+    <div class="idea-card" onclick="this.classList.toggle('expanded')">
+      <div class="idea-header">
+        <div class="idea-emoji">🧩</div>
+        <div class="idea-title">Splice-Aware Workflow</div>
+      </div>
+      <div class="idea-desc">Auto-detect the sound type (pad, lead, bass, pluck), pick the right synth archetype, warm-start the search.</div>
+      <div class="idea-tags">
+        <span class="tag">UX</span>
+        <span class="tag">CLAP embeddings</span>
+        <span class="tag green">producer-friendly</span>
+      </div>
+      <div class="idea-detail">
+        <div class="idea-detail-inner">
+          Use LAION-CLAP to embed the target audio and compare to text descriptions ("warm pad", "aggressive bass"). The top match pre-initializes CMA-ES in the right neighborhood of preset space. Don't search all 200 Surge params for a pad — start in pad territory.
+        </div>
+      </div>
+    </div>
+
+    <div class="idea-card" onclick="this.classList.toggle('expanded')">
+      <div class="idea-header">
+        <div class="idea-emoji">🧠</div>
+        <div class="idea-title">DDSP as Universal Proxy</div>
+      </div>
+      <div class="idea-desc">Use Google's differentiable signal processing as a physics-informed proxy. Harmonic oscillators + filtered noise can approximate almost anything.</div>
+      <div class="idea-tags">
+        <span class="tag">DDSP</span>
+        <span class="tag">differentiable</span>
+        <span class="tag">elegant</span>
+      </div>
+      <div class="idea-detail">
+        <div class="idea-detail-inner">
+          DDSP's harmonic + noise model is <em>physically motivated</em>. Fit it to your target in ~100 gradient steps, then map the learned characteristics (harmonic content, noise coloring, envelope) to VST parameters. Elegant bridge between neural and classical synthesis.
+        </div>
+      </div>
+    </div>
+
+    <div class="idea-card" onclick="this.classList.toggle('expanded')">
+      <div class="idea-header">
+        <div class="idea-emoji">📦</div>
+        <div class="idea-title">Batch Mode for Sample Packs</div>
+      </div>
+      <div class="idea-desc">Process an entire Splice pack overnight. 100 samples in, 100 presets out. Browse the results in a web UI.</div>
+      <div class="idea-tags">
+        <span class="tag">multiprocessing</span>
+        <span class="tag green">practical</span>
+      </div>
+      <div class="idea-detail">
+        <div class="idea-detail-inner">
+          The real workflow isn't one sample — it's "I want the best sounds from this whole pack as playable presets." DawDreamer supports multiprocessing. Run overnight, wake up to a folder of matched presets with A/B previews.
+        </div>
+      </div>
+    </div>
+
+    <div class="idea-card" onclick="this.classList.toggle('expanded')">
+      <div class="idea-header">
+        <div class="idea-emoji">🔌</div>
+        <div class="idea-title">Neutone Export → DAW Plugin</div>
+      </div>
+      <div class="idea-desc">Export your trained model as a Neutone VST. Run it directly in Ableton. A neural instrument that sounds like your target.</div>
+      <div class="idea-tags">
+        <span class="tag hot">endgame</span>
+        <span class="tag">Neutone SDK</span>
+        <span class="tag">Ableton</span>
+      </div>
+      <div class="idea-detail">
+        <div class="idea-detail-inner">
+          Neutone lets you deploy PyTorch models as VST/AU plugins. Train a DDSP or RAVE model on your matched sound, export via Neutone SDK, load it in Ableton. You've built a custom neural instrument. MIDI in, audio out, real-time.
+        </div>
+      </div>
+    </div>
+
+    <div class="idea-card" onclick="this.classList.toggle('expanded')">
+      <div class="idea-header">
+        <div class="idea-emoji">🌌</div>
+        <div class="idea-title">Sound DNA — Latent Space Explorer</div>
+      </div>
+      <div class="idea-desc">Embed sounds in a latent space. Explore neighborhoods. Morph between timbres. Find sounds you didn't know you were looking for.</div>
+      <div class="idea-tags">
+        <span class="tag">RAVE</span>
+        <span class="tag">embeddings</span>
+        <span class="tag green">creative</span>
+      </div>
+      <div class="idea-detail">
+        <div class="idea-detail-inner">
+          RAVE learns a compact latent space of sound. Train it on your sample library, then explore: what's "between" a pad and a lead? What's the neighborhood of your favorite bass? Navigate by dragging through latent space, hear everything morph in real time. Sound design as exploration, not knob-twiddling.
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ═══ WAVEFORM ═══ -->
+<div class="waveform-divider" id="waveDivider2"></div>
+
+<!-- ═══ HEAR IT ═══ -->
+<section>
+  <div class="section-label">// hear the future</div>
+  <h2>What's already possible.</h2>
+  <p>These tools exist <em>right now</em>. The building blocks are all here — nobody's assembled them into the preset-from-sample workflow yet.</p>
+
+  <div class="demos-list">
+
+    <div class="demo-card">
+      <a href="https://www.youtube.com/watch?v=xkMmBSqEjKE" target="_blank" rel="noopener" class="demo-thumb" style="background: linear-gradient(135deg, #1a0a2e, #0a1a2e);">
+        <div class="play-btn"></div>
+      </a>
+      <div class="demo-info">
+        <h3>RAVE — Real-Time Audio VAE</h3>
+        <p>IRCAM's variational autoencoder learns a latent space of any sound. Morphing, interpolation, real-time generation. Now has its own VST.</p>
+        <a href="https://github.com/acids-ircam/RAVE" target="_blank" rel="noopener" class="demo-link">GitHub →</a>
+      </div>
+    </div>
+
+    <div class="demo-card">
+      <a href="https://www.youtube.com/watch?v=Q40qEg8Yq5c" target="_blank" rel="noopener" class="demo-thumb" style="background: linear-gradient(135deg, #2e0a1a, #1a2e0a);">
+        <div class="play-btn"></div>
+      </a>
+      <div class="demo-info">
+        <h3>DDSP — Differentiable Synthesis</h3>
+        <p>Google Magenta's core insight: make signal processing differentiable. Train a violin synth on 13 minutes of audio. Backprop through oscillators.</p>
+        <a href="https://magenta.tensorflow.org/ddsp" target="_blank" rel="noopener" class="demo-link">Magenta DDSP →</a>
+      </div>
+    </div>
+
+    <div class="demo-card">
+      <a href="https://www.youtube.com/results?search_query=DawDreamer+python+vst+headless" target="_blank" rel="noopener" class="demo-thumb" style="background: linear-gradient(135deg, #0a2e1a, #2e1a0a);">
+        <div class="play-btn"></div>
+      </a>
+      <div class="demo-info">
+        <h3>DawDreamer — Headless DAW</h3>
+        <p>Load VSTs, send MIDI, automate parameters, render audio — all from Python. The engine that makes this whole project possible.</p>
+        <a href="https://github.com/DBraun/DawDreamer" target="_blank" rel="noopener" class="demo-link">GitHub →</a>
+      </div>
+    </div>
+
+    <div class="demo-card">
+      <a href="https://neutone.ai" target="_blank" rel="noopener" class="demo-thumb" style="background: linear-gradient(135deg, #1a0a2e, #2e0a1a);">
+        <div class="play-btn"></div>
+      </a>
+      <div class="demo-info">
+        <h3>Neutone — Neural Audio in Your DAW</h3>
+        <p>Deploy PyTorch models as VST plugins. The bridge between research and real music production. Free and growing.</p>
+        <a href="https://neutone.ai" target="_blank" rel="noopener" class="demo-link">neutone.ai →</a>
+      </div>
+    </div>
+
+    <div class="demo-card">
+      <a href="https://surge-synthesizer.github.io/" target="_blank" rel="noopener" class="demo-thumb" style="background: linear-gradient(135deg, #0a1a2e, #1a2e1a);">
+        <div class="play-btn"></div>
+      </a>
+      <div class="demo-info">
+        <h3>Surge XT — Our Target Synth</h3>
+        <p>Free, open-source, incredible sounding, 200+ parameters, Linux native. The perfect first synth to reverse-engineer.</p>
+        <a href="https://surge-synthesizer.github.io/" target="_blank" rel="noopener" class="demo-link">surge-synthesizer.github.io →</a>
+      </div>
+    </div>
+
+    <div class="demo-card">
+      <a href="https://github.com/PapayaResearch/synthax" target="_blank" rel="noopener" class="demo-thumb" style="background: linear-gradient(135deg, #2e1a0a, #0a2e1a);">
+        <div class="play-btn"></div>
+      </a>
+      <div class="demo-info">
+        <h3>SynthAX — 90,000× Realtime</h3>
+        <p>Modular synth in JAX. Fully differentiable, GPU-accelerated. The nuclear option for when CMA-ES feels slow.</p>
+        <a href="https://github.com/PapayaResearch/synthax" target="_blank" rel="noopener" class="demo-link">GitHub →</a>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ═══ THE STACK ═══ -->
+<section>
+  <div class="section-label">// the stack</div>
+  <h2>Everything we need exists.</h2>
+  <p>No custom hardware. No cloud GPUs (unless you want speed). Just Python, open-source tools, and a good idea.</p>
+
+  <div class="stack-flow">
+    <div class="stack-item">
+      <div class="stack-icon">🎵</div>
+      <div>
+        <div class="stack-name">Target Audio</div>
+        <div class="stack-desc">Any WAV/MP3 — Splice sample, recording, whatever</div>
+      </div>
+    </div>
+    <div class="stack-item">
+      <div class="stack-icon">👂</div>
+      <div>
+        <div class="stack-name">auraloss</div>
+        <div class="stack-desc">Multi-resolution STFT loss — perceptual audio comparison</div>
+      </div>
+    </div>
+    <div class="stack-item">
+      <div class="stack-icon">🧬</div>
+      <div>
+        <div class="stack-name">CMA-ES / Adam</div>
+        <div class="stack-desc">Black-box evolution or gradient descent through differentiable proxy</div>
+      </div>
+    </div>
+    <div class="stack-item">
+      <div class="stack-icon">🎛️</div>
+      <div>
+        <div class="stack-name">DawDreamer + Surge XT</div>
+        <div class="stack-desc">Headless VST rendering on Linux — set params, send MIDI, get numpy</div>
+      </div>
+    </div>
+    <div class="stack-item">
+      <div class="stack-icon">✅</div>
+      <div>
+        <div class="stack-name">Export Preset</div>
+        <div class="stack-desc">.fxp file → load in your DAW → play across the whole keyboard</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="quote-block">
+    "Even a few hundred trainable parameters (TINY for a machine learning model) would provide the ability to closely replicate most synth sounds."
+    <div class="attr">— parted-record README, the original vision</div>
+  </div>
+</section>
+
+<!-- ═══ LANDSCAPE ═══ -->
+<section>
+  <div class="section-label">// the gap</div>
+  <h2>Nobody's built this yet.</h2>
+  <p>AI can generate entire songs from text prompts now. MusicGen, Stable Audio, Udio, Suno — they're all about creation from scratch. But the <strong>inverse problem</strong> — "I heard this sound, give me the preset" — remains unsolved at a product level.</p>
+  <p>The research exists. The tools exist. The papers have been written. Someone just needs to assemble the pieces into something a producer can actually use.</p>
+  <p style="color: var(--accent3); font-weight: 500;">That's us. 🎛️</p>
+</section>
+
+<!-- ═══ CTA ═══ -->
+<section class="cta-section">
+  <h2>Let's build it.</h2>
+  <p style="color: var(--text-dim); margin-top: 0.5rem;">Phase 0 research: ✅ done. Time to write some code.</p>
+  <div class="cta-links">
+    <a href="https://github.com/tripp528/parted-record" target="_blank" rel="noopener" class="cta-btn primary">⚡ GitHub Repo</a>
+    <a href="https://github.com/DBraun/DawDreamer" target="_blank" rel="noopener" class="cta-btn secondary">🎛️ DawDreamer</a>
+    <a href="https://surge-synthesizer.github.io/" target="_blank" rel="noopener" class="cta-btn secondary">🎹 Surge XT</a>
+    <a href="https://arxiv.org/abs/2001.04643" target="_blank" rel="noopener" class="cta-btn secondary">📄 DDSP Paper</a>
+  </div>
+</section>
+
+<script>
+// Generate waveform dividers
+document.querySelectorAll('.waveform-divider').forEach(div => {
+  for (let i = 0; i < 60; i++) {
+    const bar = document.createElement('div');
+    bar.className = 'bar';
+    bar.style.animationDelay = `${i * 0.05}s`;
+    bar.style.height = `${4 + Math.random() * 20}px`;
+    div.appendChild(bar);
+  }
+});
+
+// Intersection observer for fade-in
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.style.opacity = '1';
+      entry.target.style.transform = 'translateY(0)';
+    }
+  });
+}, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
+
+document.querySelectorAll('.idea-card, .demo-card, .stack-item, .quote-block').forEach(el => {
+  el.style.opacity = '0';
+  el.style.transform = 'translateY(20px)';
+  el.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+  observer.observe(el);
+});
+</script>
+
+</body>
+</html>
